@@ -1,6 +1,6 @@
 -- Combined migration file that includes all necessary database setup
 
--- Users table
+-- Users table (updated for maintenance scheduling app)
 CREATE TABLE IF NOT EXISTS public.users (
     id uuid PRIMARY KEY NOT NULL,
     avatar_url text,
@@ -13,10 +13,51 @@ CREATE TABLE IF NOT EXISTS public.users (
     updated_at timestamp with time zone,
     email text,
     name text,
-    full_name text
+    full_name text,
+    role text DEFAULT 'technician' CHECK (role IN ('admin', 'technician')),
+    mode text DEFAULT 'standard' CHECK (mode IN ('standard', 'no_phone'))
 );
 
--- Subscriptions table
+-- Assets table
+CREATE TABLE IF NOT EXISTS public.assets (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    name text NOT NULL,
+    type text NOT NULL,
+    location text NOT NULL,
+    install_date date,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Tasks table
+CREATE TABLE IF NOT EXISTS public.tasks (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    title text NOT NULL,
+    asset_id uuid REFERENCES public.assets(id) ON DELETE CASCADE,
+    assigned_to text REFERENCES public.users(user_id) ON DELETE SET NULL,
+    due_date timestamp with time zone,
+    frequency text CHECK (frequency IN ('daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'one_time')),
+    checklist jsonb DEFAULT '[]'::jsonb,
+    priority text DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    status text DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'overdue')),
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Maintenance logs table
+CREATE TABLE IF NOT EXISTS public.maintenance_logs (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    task_id uuid REFERENCES public.tasks(id) ON DELETE CASCADE,
+    asset_id uuid REFERENCES public.assets(id) ON DELETE CASCADE,
+    completed_by text REFERENCES public.users(user_id) ON DELETE SET NULL,
+    date_completed timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    cost decimal(10,2),
+    time_taken integer, -- in minutes
+    notes text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Subscriptions table (updated for maintenance scheduling app)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id text REFERENCES public.users(user_id),
@@ -39,12 +80,26 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     metadata jsonb,
     custom_field_data jsonb,
     customer_id text,
+    plan_tier text DEFAULT 'basic' CHECK (plan_tier IN ('basic', 'pro', 'enterprise')),
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS subscriptions_stripe_id_idx ON public.subscriptions(stripe_id);
 CREATE INDEX IF NOT EXISTS subscriptions_user_id_idx ON public.subscriptions(user_id);
+
+-- Create indexes for maintenance scheduling tables
+CREATE INDEX IF NOT EXISTS assets_type_idx ON public.assets(type);
+CREATE INDEX IF NOT EXISTS assets_location_idx ON public.assets(location);
+CREATE INDEX IF NOT EXISTS tasks_asset_id_idx ON public.tasks(asset_id);
+CREATE INDEX IF NOT EXISTS tasks_assigned_to_idx ON public.tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS tasks_due_date_idx ON public.tasks(due_date);
+CREATE INDEX IF NOT EXISTS tasks_priority_idx ON public.tasks(priority);
+CREATE INDEX IF NOT EXISTS tasks_status_idx ON public.tasks(status);
+CREATE INDEX IF NOT EXISTS maintenance_logs_task_id_idx ON public.maintenance_logs(task_id);
+CREATE INDEX IF NOT EXISTS maintenance_logs_asset_id_idx ON public.maintenance_logs(asset_id);
+CREATE INDEX IF NOT EXISTS maintenance_logs_completed_by_idx ON public.maintenance_logs(completed_by);
+CREATE INDEX IF NOT EXISTS maintenance_logs_date_completed_idx ON public.maintenance_logs(date_completed);
 
 -- Create webhook_events table
 CREATE TABLE IF NOT EXISTS public.webhook_events (
@@ -65,35 +120,47 @@ CREATE INDEX IF NOT EXISTS webhook_events_event_type_idx ON public.webhook_event
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.maintenance_logs ENABLE ROW LEVEL SECURITY;
 
 -- Create policies if they don't exist
-DO $$
-BEGIN
-    -- Check if the policy for users exists
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'users' 
-        AND policyname = 'Users can view own data'
-    ) THEN
-        -- Create policy to allow users to see only their own data
-        EXECUTE 'CREATE POLICY "Users can view own data" ON public.users
-                FOR SELECT USING (auth.uid()::text = user_id)';
-    END IF;
+-- Policy for users
+DROP POLICY IF EXISTS "Users can view own data" ON public.users;
+CREATE POLICY "Users can view own data" ON public.users
+    FOR SELECT USING (auth.uid()::text = user_id);
 
-    -- Check if the policy for subscriptions exists
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'subscriptions' 
-        AND policyname = 'Users can view own subscriptions'
-    ) THEN
-        -- Create policy for subscriptions
-        EXECUTE 'CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
-                FOR SELECT USING (auth.uid()::text = user_id)';
-    END IF;
-END
-$$;
+-- Policy for subscriptions
+DROP POLICY IF EXISTS "Users can view own subscriptions" ON public.subscriptions;
+CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
+    FOR SELECT USING (auth.uid()::text = user_id);
+
+-- Policy for assets
+DROP POLICY IF EXISTS "Users can view assets" ON public.assets;
+CREATE POLICY "Users can view assets" ON public.assets
+    FOR SELECT USING (true);
+
+-- Policy for tasks
+DROP POLICY IF EXISTS "Users can view relevant tasks" ON public.tasks;
+CREATE POLICY "Users can view relevant tasks" ON public.tasks
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.users 
+            WHERE users.user_id = auth.uid()::text 
+            AND (users.role = 'admin' OR tasks.assigned_to = auth.uid()::text)
+        )
+    );
+
+-- Policy for maintenance logs
+DROP POLICY IF EXISTS "Users can view relevant logs" ON public.maintenance_logs;
+CREATE POLICY "Users can view relevant logs" ON public.maintenance_logs
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.users 
+            WHERE users.user_id = auth.uid()::text 
+            AND (users.role = 'admin' OR maintenance_logs.completed_by = auth.uid()::text)
+        )
+    );
 
 -- Create a function that will be triggered when a new user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -150,4 +217,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
 CREATE TRIGGER on_auth_user_updated
   AFTER UPDATE ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_user_update(); 
+  FOR EACH ROW EXECUTE FUNCTION public.handle_user_update();
+
+-- Enable realtime for maintenance scheduling tables
+alter publication supabase_realtime add table assets;
+alter publication supabase_realtime add table tasks;
+alter publication supabase_realtime add table maintenance_logs; 
