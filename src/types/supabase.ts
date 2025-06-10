@@ -106,6 +106,7 @@ export type Database = {
           image: string | null
           mode: string | null
           name: string | null
+          phone_number: string | null
           role: string | null
           subscription: string | null
           token_identifier: string
@@ -122,6 +123,7 @@ export type Database = {
           image?: string | null
           mode?: string | null
           name?: string | null
+          phone_number?: string | null
           role?: string | null
           subscription?: string | null
           token_identifier: string
@@ -138,6 +140,7 @@ export type Database = {
           image?: string | null
           mode?: string | null
           name?: string | null
+          phone_number?: string | null
           role?: string | null
           subscription?: string | null
           token_identifier?: string
