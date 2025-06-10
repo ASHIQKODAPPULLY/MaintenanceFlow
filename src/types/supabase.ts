@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      plan_limits: {
+        Row: {
+          created_at: string
+          id: string
+          plan_tier: string
+          tasks_per_week: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_tier: string
+          tasks_per_week?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_tier?: string
+          tasks_per_week?: number
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           amount: number | null
@@ -27,6 +48,7 @@ export type Database = {
           id: string
           interval: string | null
           metadata: Json | null
+          plan_tier: string | null
           price_id: string | null
           started_at: number | null
           status: string | null
@@ -52,6 +74,7 @@ export type Database = {
           id?: string
           interval?: string | null
           metadata?: Json | null
+          plan_tier?: string | null
           price_id?: string | null
           started_at?: number | null
           status?: string | null
@@ -77,6 +100,7 @@ export type Database = {
           id?: string
           interval?: string | null
           metadata?: Json | null
+          plan_tier?: string | null
           price_id?: string | null
           started_at?: number | null
           status?: string | null

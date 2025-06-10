@@ -7,7 +7,7 @@ import { createClient } from "../../supabase/server";
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();
-  const fullName = formData.get("full_name")?.toString() || '';
+  const fullName = formData.get("full_name")?.toString() || "";
   const supabase = await createClient();
 
   if (!email || !password) {
@@ -18,14 +18,17 @@ export const signUpAction = async (formData: FormData) => {
     );
   }
 
-  const { data: { user }, error } = await supabase.auth.signUp({
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
         full_name: fullName,
         email: email,
-      }
+      },
     },
   });
 
@@ -35,17 +38,14 @@ export const signUpAction = async (formData: FormData) => {
 
   if (user) {
     try {
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .insert({
-          id: user.id,
-          user_id: user.id,
-          name: fullName,
-          email: email,
-          token_identifier: user.id,
-          created_at: new Date().toISOString()
-        });
+      const { error: updateError } = await supabase.from("users").insert({
+        id: user.id,
+        user_id: user.id,
+        name: fullName,
+        email: email,
+        token_identifier: user.id,
+        created_at: new Date().toISOString(),
+      });
 
       if (updateError) {
         // Error handling without console.error
@@ -166,10 +166,10 @@ export const checkUserSubscription = async (userId: string) => {
   const supabase = await createClient();
 
   const { data: subscription, error } = await supabase
-    .from('subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
+    .from("subscriptions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "active")
     .single();
 
   if (error) {
@@ -177,4 +177,101 @@ export const checkUserSubscription = async (userId: string) => {
   }
 
   return !!subscription;
+};
+
+export const checkTaskLimit = async (userId: string) => {
+  const supabase = await createClient();
+
+  // Get user's current plan
+  const { data: subscription } = await supabase
+    .from("subscriptions")
+    .select("plan_tier, status")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .single();
+
+  const planTier = subscription?.plan_tier || "free";
+
+  // Get plan limits
+  const { data: planLimit } = await supabase
+    .from("plan_limits")
+    .select("tasks_per_week")
+    .eq("plan_tier", planTier)
+    .single();
+
+  const weeklyLimit = planLimit?.tasks_per_week || 5;
+
+  // If unlimited plan
+  if (weeklyLimit === -1) {
+    return { canCreateTask: true, currentCount: 0, limit: -1, planTier };
+  }
+
+  // Count tasks created this week
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const { data: tasks, count } = await supabase
+    .from("tasks")
+    .select("*", { count: "exact" })
+    .eq("assigned_to", userId)
+    .gte("created_at", oneWeekAgo.toISOString());
+
+  const currentCount = count || 0;
+  const canCreateTask = currentCount < weeklyLimit;
+
+  return {
+    canCreateTask,
+    currentCount,
+    limit: weeklyLimit,
+    planTier,
+  };
+};
+
+export const createTaskAction = async (formData: FormData) => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/sign-in", "Authentication required");
+  }
+
+  // Check task limits
+  const taskLimitCheck = await checkTaskLimit(user.id);
+
+  if (!taskLimitCheck.canCreateTask) {
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      `Task limit reached! You can create ${taskLimitCheck.limit} tasks per week on the ${taskLimitCheck.planTier} plan. Current: ${taskLimitCheck.currentCount}/${taskLimitCheck.limit}`,
+    );
+  }
+
+  const title = formData.get("title")?.toString();
+  const assetId = formData.get("asset_id")?.toString();
+  const assignedTo = formData.get("assigned_to")?.toString();
+  const dueDate = formData.get("due_date")?.toString();
+  const priority = formData.get("priority")?.toString() || "medium";
+  const frequency = formData.get("frequency")?.toString();
+
+  if (!title) {
+    return encodedRedirect("error", "/dashboard", "Task title is required");
+  }
+
+  const { error } = await supabase.from("tasks").insert({
+    title,
+    asset_id: assetId,
+    assigned_to: assignedTo || user.id,
+    due_date: dueDate ? new Date(dueDate).toISOString() : null,
+    priority,
+    frequency,
+    status: "pending",
+  });
+
+  if (error) {
+    return encodedRedirect("error", "/dashboard", "Failed to create task");
+  }
+
+  return encodedRedirect("success", "/dashboard", "Task created successfully!");
 };

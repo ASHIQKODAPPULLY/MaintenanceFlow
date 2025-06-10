@@ -14,7 +14,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="#features"
+                  href="/"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Features
@@ -22,7 +22,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#pricing"
+                  href="/pricing"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Pricing
@@ -38,7 +38,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/api"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   API
@@ -53,7 +53,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="#"
+                  href="/about"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   About
@@ -61,7 +61,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/blog"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Blog
@@ -69,7 +69,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/careers"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Careers
@@ -77,7 +77,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/press"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Press
@@ -92,7 +92,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="#"
+                  href="/docs"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Documentation
@@ -100,7 +100,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/help"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Help Center
@@ -108,7 +108,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/community"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Community
@@ -116,7 +116,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/status"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Status
@@ -131,7 +131,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="#"
+                  href="/privacy"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Privacy
@@ -139,7 +139,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/terms"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Terms
@@ -147,7 +147,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/security"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Security
@@ -155,7 +155,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="#"
+                  href="/cookies"
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   Cookies
@@ -172,21 +172,27 @@ export default function Footer() {
 
           <div className="flex space-x-6">
             <a
-              href="#"
+              href="https://twitter.com/maintenancehub"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-muted-foreground hover:text-primary transition-colors"
             >
               <span className="sr-only">Twitter</span>
               <Twitter className="h-6 w-6" />
             </a>
             <a
-              href="#"
+              href="https://linkedin.com/company/maintenancehub"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-muted-foreground hover:text-primary transition-colors"
             >
               <span className="sr-only">LinkedIn</span>
               <Linkedin className="h-6 w-6" />
             </a>
             <a
-              href="#"
+              href="https://github.com/maintenancehub"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-muted-foreground hover:text-primary transition-colors"
             >
               <span className="sr-only">GitHub</span>
