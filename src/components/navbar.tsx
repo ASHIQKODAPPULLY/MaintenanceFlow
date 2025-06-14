@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Button } from "./ui/button";
-import { User, UserCircle } from "lucide-react";
+import { User, UserCircle, Menu, X } from "lucide-react";
 import UserProfile from "./user-profile";
 import ThemeSwitcher from "./theme-switcher";
 
@@ -36,40 +36,106 @@ export default async function Navbar() {
   } = await supabase.auth.getUser();
 
   return (
-    <nav className="w-full border-b border-border bg-background/80 backdrop-blur-md py-2 sticky top-0 z-50">
-      <div className="container mx-auto px-4 flex justify-between items-center">
+    <nav className="w-full py-3 fixed top-0 z-50 transition-all duration-300">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
         <Link
           href="/"
           prefetch
-          className="text-xl font-bold text-primary hover:text-primary/80 transition-colors"
+          className="text-lg sm:text-xl font-bold text-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2"
         >
-          MaintenanceHub
+          <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/70 rounded-lg flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-sm">M</span>
+          </div>
+          <span className="hidden sm:inline">MaintenanceHub</span>
         </Link>
-        <div className="flex gap-4 items-center">
+
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex gap-6 items-center">
+          <nav className="flex gap-6">
+            <Link
+              href="/#features"
+              className="text-sm font-medium text-white dark:text-white hover:text-primary transition-colors duration-200"
+            >
+              Features
+            </Link>
+            <Link
+              href="/#pricing"
+              className="text-sm font-medium text-white dark:text-white hover:text-primary transition-colors duration-200"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/#about"
+              className="text-sm font-medium text-white dark:text-white hover:text-primary transition-colors duration-200"
+            >
+              About
+            </Link>
+          </nav>
+
+          <div className="flex gap-3 items-center">
+            <ThemeSwitcher />
+            {user ? (
+              <>
+                <Link href="/dashboard">
+                  <Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground border-0 px-4 py-2 text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl">
+                    Dashboard
+                  </Button>
+                </Link>
+                <UserProfile />
+              </>
+            ) : (
+              <>
+                <Link href="/sign-in">
+                  <Button
+                    variant="ghost"
+                    className="text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors duration-200"
+                  >
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/sign-up">
+                  <Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-4 py-2 text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="flex md:hidden gap-2 items-center">
           <ThemeSwitcher />
           {user ? (
             <>
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                <Button>Dashboard</Button>
+              <Link href="/dashboard">
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground border-0 px-3 py-1.5 text-xs font-medium"
+                >
+                  Dashboard
+                </Button>
               </Link>
               <UserProfile />
             </>
           ) : (
             <>
-              <Link
-                href="/sign-in"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Sign In
+              <Link href="/sign-in" className="hidden xs:block">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs font-medium px-3 py-1.5"
+                >
+                  Sign In
+                </Button>
               </Link>
-              <Link
-                href="/sign-up"
-                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90"
-              >
-                Sign Up
+              <Link href="/sign-up">
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-3 py-1.5 text-xs font-medium"
+                >
+                  Sign Up
+                </Button>
               </Link>
             </>
           )}

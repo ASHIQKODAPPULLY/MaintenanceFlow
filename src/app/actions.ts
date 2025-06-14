@@ -195,35 +195,72 @@ export const checkTaskLimit = async (userId: string) => {
   // Get plan limits
   const { data: planLimit } = await supabase
     .from("plan_limits")
-    .select("tasks_per_week")
+    .select("tasks_per_week, max_active_tasks")
     .eq("plan_tier", planTier)
     .single();
 
   const weeklyLimit = planLimit?.tasks_per_week || 5;
+  const activeTaskLimit = planLimit?.max_active_tasks || 10;
 
   // If unlimited plan
-  if (weeklyLimit === -1) {
-    return { canCreateTask: true, currentCount: 0, limit: -1, planTier };
+  if (weeklyLimit === -1 && activeTaskLimit === -1) {
+    return {
+      canCreateTask: true,
+      currentCount: 0,
+      limit: -1,
+      planTier,
+      activeTaskCount: 0,
+      activeTaskLimit: -1,
+      limitType: null,
+    };
   }
+
+  // Count active tasks (pending, in_progress)
+  const { count: activeTaskCount } = await supabase
+    .from("tasks")
+    .select("*", { count: "exact" })
+    .eq("assigned_to", userId)
+    .in("status", ["pending", "in_progress"]);
+
+  const currentActiveCount = activeTaskCount || 0;
 
   // Count tasks created this week
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-  const { data: tasks, count } = await supabase
+  const { count: weeklyTaskCount } = await supabase
     .from("tasks")
     .select("*", { count: "exact" })
     .eq("assigned_to", userId)
     .gte("created_at", oneWeekAgo.toISOString());
 
-  const currentCount = count || 0;
-  const canCreateTask = currentCount < weeklyLimit;
+  const currentWeeklyCount = weeklyTaskCount || 0;
+
+  // Check both limits
+  const activeTasksExceeded =
+    activeTaskLimit !== -1 && currentActiveCount >= activeTaskLimit;
+  const weeklyTasksExceeded =
+    weeklyLimit !== -1 && currentWeeklyCount >= weeklyLimit;
+
+  let limitType = null;
+  if (activeTasksExceeded && weeklyTasksExceeded) {
+    limitType = "both";
+  } else if (activeTasksExceeded) {
+    limitType = "active";
+  } else if (weeklyTasksExceeded) {
+    limitType = "weekly";
+  }
+
+  const canCreateTask = !activeTasksExceeded && !weeklyTasksExceeded;
 
   return {
     canCreateTask,
-    currentCount,
+    currentCount: currentWeeklyCount,
     limit: weeklyLimit,
     planTier,
+    activeTaskCount: currentActiveCount,
+    activeTaskLimit,
+    limitType,
   };
 };
 
@@ -237,15 +274,28 @@ export const createTaskAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-in", "Authentication required");
   }
 
-  // Check task limits
+  // Logic Agent: Check task limits before creation
   const taskLimitCheck = await checkTaskLimit(user.id);
 
   if (!taskLimitCheck.canCreateTask) {
-    return encodedRedirect(
-      "error",
-      "/dashboard",
-      `Task limit reached! You can create ${taskLimitCheck.limit} tasks per week on the ${taskLimitCheck.planTier} plan. Current: ${taskLimitCheck.currentCount}/${taskLimitCheck.limit}`,
-    );
+    let errorMessage = "";
+
+    // Generate specific error message based on limit type
+    switch (taskLimitCheck.limitType) {
+      case "active":
+        errorMessage = `🚫 Active task limit reached! You have ${taskLimitCheck.activeTaskCount}/${taskLimitCheck.activeTaskLimit} active tasks on the ${taskLimitCheck.planTier} plan. Complete some tasks or upgrade your plan to create more.`;
+        break;
+      case "weekly":
+        errorMessage = `🚫 Weekly task limit reached! You've created ${taskLimitCheck.currentCount}/${taskLimitCheck.limit} tasks this week on the ${taskLimitCheck.planTier} plan. Upgrade to create more tasks.`;
+        break;
+      case "both":
+        errorMessage = `🚫 Task limits reached! You have ${taskLimitCheck.activeTaskCount}/${taskLimitCheck.activeTaskLimit} active tasks and ${taskLimitCheck.currentCount}/${taskLimitCheck.limit} weekly tasks on the ${taskLimitCheck.planTier} plan. Upgrade your plan to continue.`;
+        break;
+      default:
+        errorMessage = `🚫 Task limit reached on the ${taskLimitCheck.planTier} plan. Upgrade to create more tasks.`;
+    }
+
+    return encodedRedirect("error", "/dashboard", errorMessage);
   }
 
   const title = formData.get("title")?.toString();
@@ -259,6 +309,15 @@ export const createTaskAction = async (formData: FormData) => {
     return encodedRedirect("error", "/dashboard", "Task title is required");
   }
 
+  // Validate task data before creation
+  if (title.length > 200) {
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Task title is too long (max 200 characters)",
+    );
+  }
+
   const { error } = await supabase.from("tasks").insert({
     title,
     asset_id: assetId,
@@ -270,8 +329,16 @@ export const createTaskAction = async (formData: FormData) => {
   });
 
   if (error) {
-    return encodedRedirect("error", "/dashboard", "Failed to create task");
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Failed to create task. Please try again.",
+    );
   }
 
-  return encodedRedirect("success", "/dashboard", "Task created successfully!");
+  return encodedRedirect(
+    "success",
+    "/dashboard",
+    "✅ Task created successfully!",
+  );
 };

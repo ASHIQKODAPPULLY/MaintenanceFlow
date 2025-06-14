@@ -13,18 +13,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          max_active_tasks: number | null
           plan_tier: string
           tasks_per_week: number
         }
         Insert: {
           created_at?: string
           id?: string
+          max_active_tasks?: number | null
           plan_tier: string
           tasks_per_week?: number
         }
         Update: {
           created_at?: string
           id?: string
+          max_active_tasks?: number | null
           plan_tier?: string
           tasks_per_week?: number
         }
@@ -118,6 +121,45 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      tasks: {
+        Row: {
+          asset_id: string | null
+          assigned_to: string | null
+          created_at: string | null
+          due_date: string | null
+          frequency: string | null
+          id: string
+          priority: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          frequency?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          frequency?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       users: {
         Row: {
