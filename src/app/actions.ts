@@ -8,9 +8,13 @@ export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();
   const fullName = formData.get("full_name")?.toString() || "";
+
+  console.log("SignUp attempt:", { email, hasPassword: !!password, fullName });
+
   const supabase = await createClient();
 
   if (!email || !password) {
+    console.log("Missing email or password");
     return encodedRedirect(
       "error",
       "/sign-up",
@@ -18,53 +22,50 @@ export const signUpAction = async (formData: FormData) => {
     );
   }
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.signUp({
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    console.log("Invalid email format:", email);
+    return encodedRedirect(
+      "error",
+      "/sign-up",
+      "Please enter a valid email address",
+    );
+  }
+
+  // Validate password length
+  if (password.length < 6) {
+    console.log("Password too short:", password.length);
+    return encodedRedirect(
+      "error",
+      "/sign-up",
+      "Password must be at least 6 characters long",
+    );
+  }
+
+  console.log("Attempting Supabase signup...");
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
         full_name: fullName,
+        name: fullName,
         email: email,
       },
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/dashboard`,
     },
   });
 
   if (error) {
+    console.error("Supabase signup error:", error);
     return encodedRedirect("error", "/sign-up", error.message);
   }
 
-  if (user) {
-    try {
-      const { error: updateError } = await supabase.from("users").insert({
-        id: user.id,
-        user_id: user.id,
-        name: fullName,
-        email: email,
-        token_identifier: user.id,
-        created_at: new Date().toISOString(),
-      });
-
-      if (updateError) {
-        // Error handling without console.error
-        return encodedRedirect(
-          "error",
-          "/sign-up",
-          "Error updating user. Please try again.",
-        );
-      }
-    } catch (err) {
-      // Error handling without console.error
-      return encodedRedirect(
-        "error",
-        "/sign-up",
-        "Error updating user. Please try again.",
-      );
-    }
-  }
-
+  console.log("Signup successful:", {
+    userId: data.user?.id,
+    email: data.user?.email,
+  });
   return encodedRedirect(
     "success",
     "/sign-up",
@@ -89,6 +90,99 @@ export const signInAction = async (formData: FormData) => {
   return redirect("/dashboard");
 };
 
+export const adminSignInAction = async (formData: FormData) => {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const supabase = await createClient();
+
+  // Check for admin credentials
+  if (email === "ashiqdink@gmail.com" && password === "Test12345") {
+    // First, try to sign in with existing auth user
+    const { data: signInData, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email: "ashiqdink@gmail.com",
+        password: "Test12345",
+      });
+
+    // If sign in succeeds, ensure the database user exists
+    if (!signInError && signInData.user) {
+      const { error: dbError } = await supabase.from("users").upsert(
+        {
+          id: signInData.user.id,
+          user_id: signInData.user.id,
+          name: "System Administrator",
+          full_name: "System Administrator",
+          email: "ashiqdink@gmail.com",
+          role: "admin",
+          token_identifier: signInData.user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+          ignoreDuplicates: false,
+        },
+      );
+
+      if (dbError) {
+        console.warn("Failed to ensure admin user in database:", dbError);
+      }
+    }
+
+    // If sign in fails, try to create the auth user
+    if (signInError) {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: "ashiqdink@gmail.com",
+        password: "Test12345",
+        options: {
+          data: {
+            full_name: "System Administrator",
+            role: "admin",
+          },
+        },
+      });
+
+      if (authError) {
+        return encodedRedirect(
+          "error",
+          "/sign-in",
+          "Failed to create admin account: " + authError.message,
+        );
+      }
+
+      // If auth user was created successfully, also create the database user
+      if (authData.user) {
+        const { error: dbError } = await supabase.from("users").upsert(
+          {
+            id: authData.user.id,
+            user_id: authData.user.id,
+            name: "System Administrator",
+            full_name: "System Administrator",
+            email: "admin@maintenance.app",
+            role: "admin",
+            token_identifier: authData.user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id",
+            ignoreDuplicates: false,
+          },
+        );
+
+        if (dbError) {
+          // Continue anyway, the auth user exists
+          console.warn("Failed to create admin user in database:", dbError);
+        }
+      }
+    }
+
+    return redirect("/dashboard");
+  }
+
+  return encodedRedirect("error", "/sign-in", "Invalid admin credentials");
+};
+
 export const forgotPasswordAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
   const supabase = await createClient();
@@ -98,7 +192,15 @@ export const forgotPasswordAction = async (formData: FormData) => {
     return encodedRedirect("error", "/forgot-password", "Email is required");
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {});
+  // Construct the redirect URL dynamically based on environment
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://nervous-cohen2-vhwd5.view-3.tempo-dev.app";
+  const redirectTo = `${baseUrl}/auth/callback?type=recovery&next=/dashboard/reset-password`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
 
   if (error) {
     return encodedRedirect(
@@ -126,15 +228,15 @@ export const resetPasswordAction = async (formData: FormData) => {
   const confirmPassword = formData.get("confirmPassword") as string;
 
   if (!password || !confirmPassword) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/dashboard/reset-password",
       "Password and confirm password are required",
     );
   }
 
   if (password !== confirmPassword) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
       "/dashboard/reset-password",
       "Passwords do not match",
@@ -146,14 +248,18 @@ export const resetPasswordAction = async (formData: FormData) => {
   });
 
   if (error) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
       "/dashboard/reset-password",
-      "Password update failed",
+      "Password update failed: " + error.message,
     );
   }
 
-  encodedRedirect("success", "/protected/reset-password", "Password updated");
+  return encodedRedirect(
+    "success",
+    "/dashboard",
+    "Password updated successfully!",
+  );
 };
 
 export const signOutAction = async () => {
@@ -264,6 +370,147 @@ export const checkTaskLimit = async (userId: string) => {
   };
 };
 
+export const createPropertyAction = async (formData: FormData) => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/sign-in", "Authentication required");
+  }
+
+  const name = formData.get("name")?.toString();
+  const address = formData.get("address")?.toString();
+  const propertyType = formData.get("property_type")?.toString();
+  const notes = formData.get("notes")?.toString();
+
+  if (!name) {
+    return encodedRedirect("error", "/dashboard", "Property name is required");
+  }
+
+  if (name.length > 255) {
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Property name is too long (max 255 characters)",
+    );
+  }
+
+  const { error } = await supabase.from("properties").insert({
+    name,
+    address,
+    property_type: propertyType,
+    notes,
+    owner_id: user.id,
+  });
+
+  if (error) {
+    console.error("Property creation error:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Failed to create property. Please try again.",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard",
+    "✅ Property created successfully!",
+  );
+};
+
+export const updatePropertyAction = async (formData: FormData) => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/sign-in", "Authentication required");
+  }
+
+  const id = formData.get("id")?.toString();
+  const name = formData.get("name")?.toString();
+  const address = formData.get("address")?.toString();
+  const propertyType = formData.get("property_type")?.toString();
+  const notes = formData.get("notes")?.toString();
+
+  if (!id || !name) {
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Property ID and name are required",
+    );
+  }
+
+  const { error } = await supabase
+    .from("properties")
+    .update({
+      name,
+      address,
+      property_type: propertyType,
+      notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("owner_id", user.id);
+
+  if (error) {
+    console.error("Property update error:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Failed to update property. Please try again.",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard",
+    "✅ Property updated successfully!",
+  );
+};
+
+export const deletePropertyAction = async (formData: FormData) => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/sign-in", "Authentication required");
+  }
+
+  const id = formData.get("id")?.toString();
+
+  if (!id) {
+    return encodedRedirect("error", "/dashboard", "Property ID is required");
+  }
+
+  const { error } = await supabase
+    .from("properties")
+    .delete()
+    .eq("id", id)
+    .eq("owner_id", user.id);
+
+  if (error) {
+    console.error("Property deletion error:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Failed to delete property. Please try again.",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard",
+    "✅ Property deleted successfully!",
+  );
+};
+
 export const createTaskAction = async (formData: FormData) => {
   const supabase = await createClient();
   const {
@@ -299,14 +546,26 @@ export const createTaskAction = async (formData: FormData) => {
   }
 
   const title = formData.get("title")?.toString();
-  const assetId = formData.get("asset_id")?.toString();
+  const description = formData.get("description")?.toString();
+  const propertyId = formData.get("property_id")?.toString();
   const assignedTo = formData.get("assigned_to")?.toString();
   const dueDate = formData.get("due_date")?.toString();
   const priority = formData.get("priority")?.toString() || "medium";
   const frequency = formData.get("frequency")?.toString();
+  const taskType = formData.get("task_type")?.toString() || "recurring";
+  const assetId = formData.get("asset_id")?.toString();
+  const checklistStr = formData.get("checklist")?.toString();
 
   if (!title) {
     return encodedRedirect("error", "/dashboard", "Task title is required");
+  }
+
+  if (!propertyId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard",
+      "Property selection is required",
+    );
   }
 
   // Validate task data before creation
@@ -318,17 +577,31 @@ export const createTaskAction = async (formData: FormData) => {
     );
   }
 
+  let checklist = [];
+  if (checklistStr) {
+    try {
+      checklist = JSON.parse(checklistStr);
+    } catch (error) {
+      console.error("Invalid checklist JSON:", error);
+    }
+  }
+
   const { error } = await supabase.from("tasks").insert({
     title,
-    asset_id: assetId,
+    description,
+    property_id: propertyId,
     assigned_to: assignedTo || user.id,
     due_date: dueDate ? new Date(dueDate).toISOString() : null,
     priority,
     frequency,
+    task_type: taskType,
+    asset_id: assetId || null,
+    checklist,
     status: "pending",
   });
 
   if (error) {
+    console.error("Task creation error:", error);
     return encodedRedirect(
       "error",
       "/dashboard",

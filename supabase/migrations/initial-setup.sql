@@ -14,9 +14,27 @@ CREATE TABLE IF NOT EXISTS public.users (
     email text,
     name text,
     full_name text,
+    phone_number text,
     role text DEFAULT 'technician' CHECK (role IN ('admin', 'technician')),
     mode text DEFAULT 'standard' CHECK (mode IN ('standard', 'no_phone'))
 );
+
+-- Plan limits table
+CREATE TABLE IF NOT EXISTS public.plan_limits (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    plan_tier text NOT NULL UNIQUE,
+    tasks_per_week integer NOT NULL DEFAULT 5,
+    max_active_tasks integer DEFAULT 10,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Insert default plan limits
+INSERT INTO public.plan_limits (plan_tier, tasks_per_week, max_active_tasks) VALUES
+    ('free', 5, 10),
+    ('basic', 25, 50),
+    ('pro', 100, 200),
+    ('enterprise', -1, -1)
+ON CONFLICT (plan_tier) DO NOTHING;
 
 -- Assets table
 CREATE TABLE IF NOT EXISTS public.assets (
@@ -33,13 +51,18 @@ CREATE TABLE IF NOT EXISTS public.assets (
 CREATE TABLE IF NOT EXISTS public.tasks (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     title text NOT NULL,
+    description text,
     asset_id uuid REFERENCES public.assets(id) ON DELETE CASCADE,
     assigned_to text REFERENCES public.users(user_id) ON DELETE SET NULL,
+    created_by text REFERENCES public.users(user_id) ON DELETE SET NULL,
     due_date timestamp with time zone,
     frequency text CHECK (frequency IN ('daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'one_time')),
     checklist jsonb DEFAULT '[]'::jsonb,
     priority text DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
-    status text DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'overdue')),
+    status text DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'overdue', 'cancelled')),
+    estimated_duration integer, -- in minutes
+    actual_duration integer, -- in minutes
+    tags text[],
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -222,4 +245,5 @@ CREATE TRIGGER on_auth_user_updated
 -- Enable realtime for maintenance scheduling tables
 alter publication supabase_realtime add table assets;
 alter publication supabase_realtime add table tasks;
-alter publication supabase_realtime add table maintenance_logs; 
+alter publication supabase_realtime add table maintenance_logs;
+alter publication supabase_realtime add table plan_limits;

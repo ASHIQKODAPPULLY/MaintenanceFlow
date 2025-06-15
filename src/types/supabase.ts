@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      assets: {
+        Row: {
+          created_at: string | null
+          id: string
+          install_date: string | null
+          location: string | null
+          name: string
+          type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          install_date?: string | null
+          location?: string | null
+          name: string
+          type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          install_date?: string | null
+          location?: string | null
+          name?: string
+          type?: string | null
+        }
+        Relationships: []
+      }
       plan_limits: {
         Row: {
           created_at: string
@@ -30,6 +57,39 @@ export type Database = {
           max_active_tasks?: number | null
           plan_tier?: string
           tasks_per_week?: number
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          id: string
+          name: string
+          notes: string | null
+          owner_id: string | null
+          property_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          owner_id?: string | null
+          property_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          owner_id?: string | null
+          property_type?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -126,44 +186,71 @@ export type Database = {
         Row: {
           asset_id: string | null
           assigned_to: string | null
+          checklist: Json | null
+          completed_at: string | null
+          completion_notes: string | null
           created_at: string | null
+          description: string | null
           due_date: string | null
           frequency: string | null
           id: string
           priority: string | null
+          property_id: string | null
           status: string | null
+          task_type: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
           asset_id?: string | null
           assigned_to?: string | null
+          checklist?: Json | null
+          completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string | null
+          description?: string | null
           due_date?: string | null
           frequency?: string | null
           id?: string
           priority?: string | null
+          property_id?: string | null
           status?: string | null
+          task_type?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
           asset_id?: string | null
           assigned_to?: string | null
+          checklist?: Json | null
+          completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string | null
+          description?: string | null
           due_date?: string | null
           frequency?: string | null
           id?: string
           priority?: string | null
+          property_id?: string | null
           status?: string | null
+          task_type?: string | null
           title?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
           avatar_url: string | null
+          contact_method: string | null
           created_at: string
           credits: string | null
           email: string | null
@@ -172,6 +259,7 @@ export type Database = {
           image: string | null
           mode: string | null
           name: string | null
+          notification_preferences: Json | null
           phone_number: string | null
           role: string | null
           subscription: string | null
@@ -181,6 +269,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          contact_method?: string | null
           created_at?: string
           credits?: string | null
           email?: string | null
@@ -189,6 +278,7 @@ export type Database = {
           image?: string | null
           mode?: string | null
           name?: string | null
+          notification_preferences?: Json | null
           phone_number?: string | null
           role?: string | null
           subscription?: string | null
@@ -198,6 +288,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          contact_method?: string | null
           created_at?: string
           credits?: string | null
           email?: string | null
@@ -206,6 +297,7 @@ export type Database = {
           image?: string | null
           mode?: string | null
           name?: string | null
+          notification_preferences?: Json | null
           phone_number?: string | null
           role?: string | null
           subscription?: string | null

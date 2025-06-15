@@ -9,17 +9,20 @@ interface TaskNotification {
     due_date: string;
     checklist: any[];
     priority: string;
+    task_type: string;
+    description?: string;
   };
-  asset: {
+  property: {
     name: string;
-    type: string;
-    location: string;
+    address?: string;
+    property_type?: string;
   };
   technician: {
     name: string;
     email: string;
     phone_number: string;
-    mode: string;
+    contact_method: string;
+    notification_preferences: any;
   };
 }
 
@@ -49,18 +52,21 @@ Deno.serve(async (req) => {
         due_date,
         checklist,
         priority,
-        asset_id,
+        task_type,
+        description,
+        property_id,
         assigned_to,
-        assets!inner (
+        properties (
           name,
-          type,
-          location
+          address,
+          property_type
         ),
         users!inner (
           name,
           email,
           phone_number,
-          mode
+          contact_method,
+          notification_preferences
         )
       `,
       )
@@ -94,17 +100,24 @@ Deno.serve(async (req) => {
           due_date: task.due_date || "",
           checklist: task.checklist || [],
           priority: task.priority || "medium",
+          task_type: task.task_type || "recurring",
+          description: task.description,
         },
-        asset: {
-          name: task.assets?.name || "Unknown Asset",
-          type: task.assets?.type || "Unknown Type",
-          location: task.assets?.location || "Unknown Location",
+        property: {
+          name: task.properties?.name || "Unknown Property",
+          address: task.properties?.address,
+          property_type: task.properties?.property_type,
         },
         technician: {
           name: task.users?.name || "Unknown Technician",
           email: task.users?.email || "",
           phone_number: task.users?.phone_number || "",
-          mode: task.users?.mode || "standard",
+          contact_method: task.users?.contact_method || "email",
+          notification_preferences: task.users?.notification_preferences || {
+            email: true,
+            sms: false,
+            whatsapp: false,
+          },
         },
       };
 
@@ -155,10 +168,15 @@ async function sendNotification(
 
   // Priority order: SMS (if phone available and not no_phone mode) > Email > PDF
 
-  // Check for SMS first (highest priority if available and mode allows)
+  // Check notification preferences and contact method
+  const preferences = notification.technician.notification_preferences;
+  const contactMethod = notification.technician.contact_method;
+
+  // Check for SMS first (if enabled in preferences and phone available)
   if (
     notification.technician.phone_number &&
-    notification.technician.mode !== "no_phone"
+    (preferences.sms || contactMethod === "sms") &&
+    contactMethod !== "no_phone"
   ) {
     try {
       await sendSmsNotification(
@@ -176,8 +194,11 @@ async function sendNotification(
     }
   }
 
-  // Fallback to email if SMS failed or not available
-  if (notification.technician.email) {
+  // Fallback to email if SMS failed or not available (and email is enabled)
+  if (
+    notification.technician.email &&
+    (preferences.email || contactMethod === "email")
+  ) {
     try {
       await sendEmailNotification(
         notification.technician.email,
@@ -215,14 +236,13 @@ function formatMessage(notification: TaskNotification): string {
 Maintenance Task Reminder
 
 Task: ${notification.task.title}
+Type: ${notification.task.task_type.replace("_", " ").toUpperCase()}
 Priority: ${notification.task.priority.toUpperCase()}
 Due Date: ${dueDate}
 
-Asset Information:
-- Name: ${notification.asset.name}
-- Type: ${notification.asset.type}
-- Location: ${notification.asset.location}
-
+${notification.task.description ? `Description: ${notification.task.description}\n\n` : ""}Property Information:
+- Name: ${notification.property.name}
+${notification.property.address ? `- Address: ${notification.property.address}\n` : ""}${notification.property.property_type ? `- Type: ${notification.property.property_type}\n` : ""}
 Checklist:
 ${checklistItems || "No checklist items"}
 
@@ -320,7 +340,7 @@ async function sendSmsNotification(
 function formatSmsMessage(notification: TaskNotification): string {
   const dueDate = new Date(notification.task.due_date).toLocaleDateString();
 
-  return `🔧 MAINTENANCE ALERT\n\n${notification.task.title}\nPriority: ${notification.task.priority.toUpperCase()}\nDue: ${dueDate}\nAsset: ${notification.asset.name} (${notification.asset.location})\n\nComplete by due date. Check app for full details.`;
+  return `🔧 MAINTENANCE ALERT\n\n${notification.task.title}\nPriority: ${notification.task.priority.toUpperCase()}\nDue: ${dueDate}\nProperty: ${notification.property.name}${notification.property.address ? ` (${notification.property.address})` : ""}\n\nComplete by due date. Check app for full details.`;
 }
 
 async function generatePdfNotification(notification: TaskNotification) {
