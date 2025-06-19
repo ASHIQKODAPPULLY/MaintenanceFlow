@@ -126,7 +126,8 @@ export default async function Dashboard() {
         .select(
           `
           *,
-          properties(name, address)
+          properties(name, address),
+          assigned_user:users!tasks_assigned_to_fkey(name, full_name, email)
         `,
         )
         .order("created_at", { ascending: false })
@@ -136,7 +137,8 @@ export default async function Dashboard() {
         .select(
           `
           *,
-          properties(name, address)
+          properties(name, address),
+          assigned_user:users!tasks_assigned_to_fkey(name, full_name, email)
         `,
         )
         .eq("assigned_to", user.id)
@@ -320,6 +322,7 @@ function DashboardContent({
             tasks={tasks}
             taskLimitInfo={taskLimitInfo}
             isAdmin={isAdmin}
+            userId={user.id}
           />
 
           {/* User Profile Section */}

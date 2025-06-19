@@ -36,6 +36,144 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_logs: {
+        Row: {
+          after_photos: string[] | null
+          before_photos: string[] | null
+          completion_date: string | null
+          compliance_status: string | null
+          cost: number | null
+          created_at: string | null
+          description: string | null
+          documentation_files: string[] | null
+          id: string
+          inspection_date: string | null
+          inspector_certification: string | null
+          inspector_name: string | null
+          labor_hours: number | null
+          legal_compliance_verified: boolean | null
+          log_type: string
+          materials_used: string | null
+          metadata: Json | null
+          next_inspection_due: string | null
+          plant_id: string | null
+          priority: string | null
+          property_id: string | null
+          qa_approved: boolean | null
+          qa_approved_by: string | null
+          qa_approved_date: string | null
+          regulatory_requirements: string | null
+          safety_notes: string | null
+          status: string
+          task_id: string | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          after_photos?: string[] | null
+          before_photos?: string[] | null
+          completion_date?: string | null
+          compliance_status?: string | null
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          documentation_files?: string[] | null
+          id?: string
+          inspection_date?: string | null
+          inspector_certification?: string | null
+          inspector_name?: string | null
+          labor_hours?: number | null
+          legal_compliance_verified?: boolean | null
+          log_type?: string
+          materials_used?: string | null
+          metadata?: Json | null
+          next_inspection_due?: string | null
+          plant_id?: string | null
+          priority?: string | null
+          property_id?: string | null
+          qa_approved?: boolean | null
+          qa_approved_by?: string | null
+          qa_approved_date?: string | null
+          regulatory_requirements?: string | null
+          safety_notes?: string | null
+          status?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          after_photos?: string[] | null
+          before_photos?: string[] | null
+          completion_date?: string | null
+          compliance_status?: string | null
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          documentation_files?: string[] | null
+          id?: string
+          inspection_date?: string | null
+          inspector_certification?: string | null
+          inspector_name?: string | null
+          labor_hours?: number | null
+          legal_compliance_verified?: boolean | null
+          log_type?: string
+          materials_used?: string | null
+          metadata?: Json | null
+          next_inspection_due?: string | null
+          plant_id?: string | null
+          priority?: string | null
+          property_id?: string | null
+          qa_approved?: boolean | null
+          qa_approved_by?: string | null
+          qa_approved_date?: string | null
+          regulatory_requirements?: string | null
+          safety_notes?: string | null
+          status?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_qa_approved_by_fkey"
+            columns: ["qa_approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       plan_limits: {
         Row: {
           created_at: string
@@ -57,6 +195,42 @@ export type Database = {
           max_active_tasks?: number | null
           plan_tier?: string
           tasks_per_week?: number
+        }
+        Relationships: []
+      }
+      plants: {
+        Row: {
+          capacity: string | null
+          created_at: string | null
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          owner_id: string | null
+          plant_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          capacity?: string | null
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          owner_id?: string | null
+          plant_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          capacity?: string | null
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          owner_id?: string | null
+          plant_type?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -194,6 +368,7 @@ export type Database = {
           due_date: string | null
           frequency: string | null
           id: string
+          plant_id: string | null
           priority: string | null
           property_id: string | null
           status: string | null
@@ -212,6 +387,7 @@ export type Database = {
           due_date?: string | null
           frequency?: string | null
           id?: string
+          plant_id?: string | null
           priority?: string | null
           property_id?: string | null
           status?: string | null
@@ -230,6 +406,7 @@ export type Database = {
           due_date?: string | null
           frequency?: string | null
           id?: string
+          plant_id?: string | null
           priority?: string | null
           property_id?: string | null
           status?: string | null
@@ -238,6 +415,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_property_id_fkey"
             columns: ["property_id"]
