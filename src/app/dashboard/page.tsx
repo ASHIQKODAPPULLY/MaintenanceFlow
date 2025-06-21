@@ -58,7 +58,7 @@ export default async function Dashboard() {
       .single();
 
     isAdmin =
-      profileByEmail?.role === "admin" || user.email === "ashiqdink@gmail.com";
+      profileByEmail?.role === "admin" || user.email === "test@gmail.com";
   }
 
   // Debug logging for admin detection

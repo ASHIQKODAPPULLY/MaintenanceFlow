@@ -3,6 +3,7 @@
 import { encodedRedirect } from "@/utils/utils";
 import { redirect } from "next/navigation";
 import { createClient } from "../../supabase/server";
+import { createAdminClient } from "../../supabase/admin-client";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -78,41 +79,25 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password") as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    return encodedRedirect("error", "/sign-in", error.message);
-  }
-
-  return redirect("/dashboard");
-};
-
-export const adminSignInAction = async (formData: FormData) => {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const supabase = await createClient();
-
-  // Check for admin credentials
-  if (email === "ashiqdink@gmail.com" && password === "Test12345") {
-    // First, try to sign in with existing auth user
+  // Special handling for admin user - create directly in auth.users if needed
+  if (email === "admin@tempodemo.com" && password === "Admin12345") {
+    // Try to sign in first
     const { data: signInData, error: signInError } =
       await supabase.auth.signInWithPassword({
-        email: "ashiqdink@gmail.com",
-        password: "Test12345",
+        email,
+        password,
       });
 
-    // If sign in succeeds, ensure the database user exists
+    // If sign in successful, ensure admin role in database
     if (!signInError && signInData.user) {
-      const { error: dbError } = await supabase.from("users").upsert(
+      const adminClient = createAdminClient();
+      const { error: dbError } = await adminClient.from("users").upsert(
         {
           id: signInData.user.id,
           user_id: signInData.user.id,
           name: "System Administrator",
           full_name: "System Administrator",
-          email: "ashiqdink@gmail.com",
+          email: "admin@tempodemo.com",
           role: "admin",
           token_identifier: signInData.user.id,
           created_at: new Date().toISOString(),
@@ -127,40 +112,51 @@ export const adminSignInAction = async (formData: FormData) => {
       if (dbError) {
         console.warn("Failed to ensure admin user in database:", dbError);
       }
+
+      return redirect("/dashboard");
     }
 
-    // If sign in fails, try to create the auth user
-    if (signInError) {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: "ashiqdink@gmail.com",
-        password: "Test12345",
-        options: {
-          data: {
-            full_name: "System Administrator",
-            role: "admin",
-          },
-        },
-      });
+    // If sign in failed, create the user directly using admin client
+    if (
+      signInError &&
+      signInError.message.includes("Invalid login credentials")
+    ) {
+      console.log("Creating admin user directly in auth.users...");
 
-      if (authError) {
+      const adminClient = createAdminClient();
+
+      // Create user directly in auth.users table using admin client
+      const { data: adminUser, error: createError } =
+        await adminClient.auth.admin.createUser({
+          email: "admin@tempodemo.com",
+          password: "Admin12345",
+          email_confirm: true, // Skip email verification
+          user_metadata: {
+            full_name: "System Administrator",
+            name: "System Administrator",
+          },
+        });
+
+      if (createError) {
+        console.error("Failed to create admin user:", createError);
         return encodedRedirect(
           "error",
           "/sign-in",
-          "Failed to create admin account: " + authError.message,
+          "Failed to create admin account: " + createError.message,
         );
       }
 
-      // If auth user was created successfully, also create the database user
-      if (authData.user) {
-        const { error: dbError } = await supabase.from("users").upsert(
+      if (adminUser.user) {
+        // Create corresponding record in public.users table
+        const { error: dbError } = await adminClient.from("users").upsert(
           {
-            id: authData.user.id,
-            user_id: authData.user.id,
+            id: adminUser.user.id,
+            user_id: adminUser.user.id,
             name: "System Administrator",
             full_name: "System Administrator",
-            email: "admin@maintenance.app",
+            email: "admin@tempodemo.com",
             role: "admin",
-            token_identifier: authData.user.id,
+            token_identifier: adminUser.user.id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
@@ -171,16 +167,51 @@ export const adminSignInAction = async (formData: FormData) => {
         );
 
         if (dbError) {
-          // Continue anyway, the auth user exists
           console.warn("Failed to create admin user in database:", dbError);
         }
+
+        // Now try to sign in with the created user
+        const { data: finalSignInData, error: finalSignInError } =
+          await supabase.auth.signInWithPassword({
+            email: "admin@tempodemo.com",
+            password: "Admin12345",
+          });
+
+        if (finalSignInError) {
+          console.error(
+            "Failed to sign in after creating admin:",
+            finalSignInError,
+          );
+          return encodedRedirect(
+            "error",
+            "/sign-in",
+            "Admin account created but sign in failed. Please try again.",
+          );
+        }
+
+        return redirect("/dashboard");
       }
     }
 
-    return redirect("/dashboard");
+    // If we get here, something went wrong with the admin account
+    return encodedRedirect(
+      "error",
+      "/sign-in",
+      signInError?.message || "Failed to process admin login",
+    );
   }
 
-  return encodedRedirect("error", "/sign-in", "Invalid admin credentials");
+  // Regular sign in for other users
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  return redirect("/dashboard");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
